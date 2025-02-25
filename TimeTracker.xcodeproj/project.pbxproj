@@ -6,6 +6,11 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		D51CC1422D66D73200D85434 /* ActivityRecord+CoreDataClass.swift in Sources */ = {isa = PBXBuildFile; fileRef = D51CC1402D66D73200D85434 /* ActivityRecord+CoreDataClass.swift */; };
+		D51CC1432D66D73200D85434 /* ActivityRecord+CoreDataProperties.swift in Sources */ = {isa = PBXBuildFile; fileRef = D51CC1412D66D73200D85434 /* ActivityRecord+CoreDataProperties.swift */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		D5768DD22D6538460073A942 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -24,6 +29,8 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		D51CC1402D66D73200D85434 /* ActivityRecord+CoreDataClass.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ActivityRecord+CoreDataClass.swift"; sourceTree = "<group>"; };
+		D51CC1412D66D73200D85434 /* ActivityRecord+CoreDataProperties.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ActivityRecord+CoreDataProperties.swift"; sourceTree = "<group>"; };
 		D5768DBB2D6538450073A942 /* TimeTracker.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TimeTracker.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		D5768DD12D6538460073A942 /* TimeTrackerTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = TimeTrackerTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		D5768DDB2D6538460073A942 /* TimeTrackerUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = TimeTrackerUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -75,6 +82,8 @@
 		D5768DB22D6538450073A942 = {
 			isa = PBXGroup;
 			children = (
+				D51CC1402D66D73200D85434 /* ActivityRecord+CoreDataClass.swift */,
+				D51CC1412D66D73200D85434 /* ActivityRecord+CoreDataProperties.swift */,
 				D5768DBD2D6538450073A942 /* TimeTracker */,
 				D5768DD42D6538460073A942 /* TimeTrackerTests */,
 				D5768DDE2D6538460073A942 /* TimeTrackerUITests */,
@@ -236,6 +245,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				D51CC1422D66D73200D85434 /* ActivityRecord+CoreDataClass.swift in Sources */,
+				D51CC1432D66D73200D85434 /* ActivityRecord+CoreDataProperties.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

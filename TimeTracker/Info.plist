@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>NSUserNotificationAlertStyle</key>
+	<string>alert</string>
+	<key>NSAppleEventsUsageDescription</key>
+	<string>Time Tracker needs to access running applications to track time.</string>
+	<key>NSWorkspaceWillLaunchApplicationNotification</key>
+	<string>Time Tracker needs to monitor application launches to track time.</string>
+	<key>LSUIElement</key>
+	<true/>
+</dict>
+</plist>
