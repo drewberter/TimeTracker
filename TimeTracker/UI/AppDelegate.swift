@@ -52,6 +52,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
 		// Open main window
 		menu.addItem(NSMenuItem(title: "Open Dashboard", action: #selector(openDashboard), keyEquivalent: "d"))
 		
+		// Add Billing Reports menu item
+		menu.addItem(NSMenuItem(title: "Billing Reports", action: #selector(openReports), keyEquivalent: "r"))
+		
 		// Toggle tracking
 		toggleTrackingItem = NSMenuItem(title: "Pause Tracking", action: #selector(toggleTracking), keyEquivalent: "p")
 		menu.addItem(toggleTrackingItem)
@@ -102,6 +105,21 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
 		
 		window.title = "Time Tracker Dashboard"
 		window.contentView = NSHostingView(rootView: ContentView()
+			.environment(\.managedObjectContext, PersistenceController.shared.container.viewContext))
+		window.center()
+		window.makeKeyAndOrderFront(nil)
+	}
+	
+	@objc func openReports() {
+		let window = NSWindow(
+			contentRect: NSRect(x: 0, y: 0, width: 900, height: 600),
+			styleMask: [.titled, .closable, .miniaturizable, .resizable],
+			backing: .buffered,
+			defer: false
+		)
+		
+		window.title = "Billing Reports"
+		window.contentView = NSHostingView(rootView: BillingReportsView()
 			.environment(\.managedObjectContext, PersistenceController.shared.container.viewContext))
 		window.center()
 		window.makeKeyAndOrderFront(nil)

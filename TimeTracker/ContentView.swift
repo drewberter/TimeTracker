@@ -151,7 +151,7 @@ struct ContentView: View {
 							}
 						}
 					}
-					.listStyle(.insetGrouped)
+					// No list style for macOS compatibility
 				} else {
 					// Chronological view
 					List {
@@ -177,7 +177,7 @@ struct ContentView: View {
 							}
 						}
 					}
-					.listStyle(.insetGrouped)
+					.listStyle(.grouped) // Changed from .insetGrouped to .grouped
 				}
 			}
 			.toolbar {
@@ -420,7 +420,7 @@ struct BulkProjectAssignmentView: View {
 			Form {
 				Section(header: Text("Project Number")) {
 					TextField("Enter Project Number", text: $projectNumber)
-						.autocapitalization(.allCharacters)
+						// Remove autocapitalization which is unavailable in macOS
 				}
 				
 				Section(header: Text("Recent Projects")) {
@@ -442,18 +442,22 @@ struct BulkProjectAssignmentView: View {
 				}
 			}
 			.navigationTitle("Assign Project")
-			.navigationBarItems(
-				leading: Button("Cancel") {
-					dismiss()
-				},
-				trailing: Button("Assign") {
-					onAssign()
+			.toolbar {
+				ToolbarItem(placement: .cancellationAction) {
+					Button("Cancel") {
+						dismiss()
+					}
 				}
-			)
+				
+				ToolbarItem(placement: .confirmationAction) {
+					Button("Assign") {
+						onAssign()
+					}
+				}
+			}
 			.onAppear {
 				// Fetch recent projects from ProjectMatcher
-				// This is a placeholder - would need to implement a method to expose recent projects
-				recentProjects = ["BMS1234", "BMS1235", "BMS1236", "BMS1237", "BMS1238"]
+				recentProjects = ProjectMatcher.shared.getRecentProjects()
 			}
 		}
 	}

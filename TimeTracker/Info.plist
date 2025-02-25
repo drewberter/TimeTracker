@@ -8,6 +8,8 @@
 	<string>Time Tracker needs to access running applications to track time.</string>
 	<key>NSWorkspaceWillLaunchApplicationNotification</key>
 	<string>Time Tracker needs to monitor application launches to track time.</string>
+	<key>NSUserNotificationUsageDescription</key>
+	<string>TimeTracker needs notifications to confirm project assignments</string>
 	<key>LSUIElement</key>
 	<true/>
 </dict>

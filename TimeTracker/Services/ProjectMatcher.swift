@@ -6,6 +6,11 @@ class ProjectMatcher {
 	// Changed to public for access from UI
 	private(set) var recentProjects: [String] = []
 	
+	init() {
+		// Load recent projects when initializing
+		loadRecentProjects()
+	}
+	
 	func guessProject(title: String, path: String) -> String? {
 		// First check if title contains a project number
 		if let projectNum = findProjectNumber(in: title) {
