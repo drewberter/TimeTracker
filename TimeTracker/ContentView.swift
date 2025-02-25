@@ -5,15 +5,31 @@ struct ContentView: View {
 	@Environment(\.managedObjectContext) private var viewContext
 	@State private var selectedDate = Date()
 	@State private var showingProjectsOnly = false
+	@State private var selectedActivities: Set<NSManagedObjectID> = []
+	@State private var showingBulkAssignmentSheet = false
+	@State private var bulkProjectNumber = ""
+	@State private var searchText = ""
 
 	@FetchRequest(
 		sortDescriptors: [NSSortDescriptor(keyPath: \ActivityRecord.timestamp, ascending: true)],
 		animation: .default)
 	private var activities: FetchedResults<ActivityRecord>
 	
+	var filteredActivities: [ActivityRecord] {
+		if searchText.isEmpty {
+			return Array(activities)
+		} else {
+			return activities.filter { activity in
+				(activity.title?.localizedCaseInsensitiveContains(searchText) ?? false) ||
+				(activity.application?.localizedCaseInsensitiveContains(searchText) ?? false) ||
+				(activity.projectNumber?.localizedCaseInsensitiveContains(searchText) ?? false)
+			}
+		}
+	}
+	
 	// Group activities by project
 	private var groupedActivities: [String: [ActivityRecord]] {
-		Dictionary(grouping: activities) { activity in
+		Dictionary(grouping: filteredActivities) { activity in
 			activity.projectNumber ?? "Unassigned"
 		}
 	}
@@ -21,6 +37,18 @@ struct ContentView: View {
 	// Calculate total duration for each project
 	private func totalDuration(for project: String) -> Double {
 		groupedActivities[project]?.reduce(0) { $0 + $1.duration } ?? 0
+	}
+	
+	// Calculate total billable time for all projects
+	private var totalBillableTime: Double {
+		let allProjects = groupedActivities.keys
+		return allProjects.reduce(0) { total, project in
+			// Skip unassigned activities when calculating billable time
+			if project == "Unassigned" {
+				return total
+			}
+			return total + totalDuration(for: project)
+		}
 	}
 
 	var body: some View {
@@ -31,8 +59,19 @@ struct ContentView: View {
 					.padding()
 					.onChange(of: selectedDate) { _, newDate in
 						updateFetchRequest(for: newDate)
+						selectedActivities.removeAll()
 					}
 				
+				// Search bar
+				HStack {
+					Image(systemName: "magnifyingglass")
+						.foregroundColor(.secondary)
+					TextField("Search activities", text: $searchText)
+						.textFieldStyle(.roundedBorder)
+				}
+				.padding(.horizontal)
+				
+				// View controls and summary info
 				HStack {
 					Text("View Mode:")
 					Picker("View Mode", selection: $showingProjectsOnly) {
@@ -44,11 +83,51 @@ struct ContentView: View {
 					
 					Spacer()
 					
+					// Only show billable time if we have any
+					if totalBillableTime > 0 {
+						Text("Billable: \(formatDuration(totalBillableTime))")
+							.bold()
+							.padding(.horizontal)
+					}
+					
 					Button(action: refreshActivities) {
 						Label("Refresh", systemImage: "arrow.clockwise")
 					}
 				}
 				.padding(.horizontal)
+				
+				// Multi-selection action bar
+				if !selectedActivities.isEmpty {
+					HStack {
+						Text("\(selectedActivities.count) selected")
+							.foregroundColor(.secondary)
+							
+						Spacer()
+						
+						Button(action: {
+							showingBulkAssignmentSheet = true
+						}) {
+							Label("Assign Project", systemImage: "tag")
+								.padding(.horizontal, 8)
+								.padding(.vertical, 4)
+								.background(Color.blue.opacity(0.1))
+								.cornerRadius(6)
+						}
+						
+						Button(action: {
+							deleteSelectedActivities()
+						}) {
+							Label("Delete", systemImage: "trash")
+								.padding(.horizontal, 8)
+								.padding(.vertical, 4)
+								.background(Color.red.opacity(0.1))
+								.cornerRadius(6)
+						}
+					}
+					.padding(.horizontal)
+					.padding(.vertical, 8)
+					.background(Color.secondary.opacity(0.1))
+				}
 				
 				if showingProjectsOnly {
 					// Project-grouped view
@@ -56,30 +135,49 @@ struct ContentView: View {
 						ForEach(Array(groupedActivities.keys.sorted()), id: \.self) { project in
 							Section(header: ProjectHeader(projectName: project, totalDuration: totalDuration(for: project))) {
 								ForEach(groupedActivities[project] ?? []) { activity in
-									NavigationLink {
-										ActivityDetailView(activity: activity)
-									} label: {
-										ActivityRow(activity: activity)
+									ActivityRow(
+										activity: activity,
+										isSelected: selectedActivities.contains(activity.objectID),
+										onToggle: { toggleSelection(activity) }
+									)
+									.swipeActions {
+										Button(role: .destructive) {
+											deleteActivity(activity)
+										} label: {
+											Label("Delete", systemImage: "trash")
+										}
 									}
 								}
-								.onDelete { indexSet in
-									deleteActivities(at: indexSet, from: project)
+							}
+						}
+					}
+					.listStyle(.insetGrouped)
+				} else {
+					// Chronological view
+					List {
+						ForEach(filteredActivities, id: \.objectID) { activity in
+							ActivityRow(
+								activity: activity,
+								isSelected: selectedActivities.contains(activity.objectID),
+								onToggle: { toggleSelection(activity) }
+							)
+							.swipeActions {
+								Button {
+									showProjectAssignmentSheet(for: activity)
+								} label: {
+									Label("Assign", systemImage: "tag")
+								}
+								.tint(.blue)
+								
+								Button(role: .destructive) {
+									deleteActivity(activity)
+								} label: {
+									Label("Delete", systemImage: "trash")
 								}
 							}
 						}
 					}
-				} else {
-					// Chronological view (original)
-					List {
-						ForEach(activities) { activity in
-							NavigationLink {
-								ActivityDetailView(activity: activity)
-							} label: {
-								ActivityRow(activity: activity)
-							}
-						}
-						.onDelete(perform: deleteActivities)
-					}
+					.listStyle(.insetGrouped)
 				}
 			}
 			.toolbar {
@@ -88,8 +186,40 @@ struct ContentView: View {
 						Label("Refresh", systemImage: "arrow.clockwise")
 					}
 				}
+				
+				ToolbarItem(placement: .automatic) {
+					Menu {
+						Button(action: {
+							selectedActivities = Set(activities.map { $0.objectID })
+						}) {
+							Label("Select All", systemImage: "checkmark.circle")
+						}
+						
+						if !selectedActivities.isEmpty {
+							Button(action: {
+								selectedActivities.removeAll()
+							}) {
+								Label("Deselect All", systemImage: "xmark.circle")
+							}
+						}
+						
+						Divider()
+						
+						Button(action: exportData) {
+							Label("Export Data", systemImage: "square.and.arrow.up")
+						}
+					} label: {
+						Label("More", systemImage: "ellipsis.circle")
+					}
+				}
 			}
 			.navigationTitle("Time Tracker")
+			.sheet(isPresented: $showingBulkAssignmentSheet) {
+				BulkProjectAssignmentView(
+					projectNumber: $bulkProjectNumber,
+					onAssign: assignProjectToBulk
+				)
+			}
 			
 			// Default detail view
 			Text("Select an activity to see details")
@@ -113,26 +243,72 @@ struct ContentView: View {
 	}
 
 	private func refreshActivities() {
-		// Direct access to ActivityTracker without going through AppDelegate
+		// Direct access to ActivityTracker
 		ActivityTracker.shared.checkCurrentActivity()
 		
 		// Refresh the fetch request
 		updateFetchRequest(for: selectedDate)
 	}
-
-	private func deleteActivities(offsets: IndexSet) {
+	
+	private func toggleSelection(_ activity: ActivityRecord) {
+		if selectedActivities.contains(activity.objectID) {
+			selectedActivities.remove(activity.objectID)
+		} else {
+			selectedActivities.insert(activity.objectID)
+		}
+	}
+	
+	private func showProjectAssignmentSheet(for activity: ActivityRecord) {
+		// Set the selected activity and show sheet for individual assignment
+		selectedActivities = [activity.objectID]
+		bulkProjectNumber = activity.projectNumber ?? ""
+		showingBulkAssignmentSheet = true
+	}
+	
+	private func assignProjectToBulk() {
+		// Assign the project number to all selected activities
+		for objectID in selectedActivities {
+			if let activity = try? viewContext.existingObject(with: objectID) as? ActivityRecord {
+				activity.projectNumber = bulkProjectNumber
+			}
+		}
+		
+		// Update project matcher with the new project
+		if !bulkProjectNumber.isEmpty {
+			ProjectMatcher.shared.updateRecentProjects(bulkProjectNumber)
+		}
+		
+		// Save changes
+		saveContext()
+		
+		// Clear selection and close sheet
+		showingBulkAssignmentSheet = false
+		selectedActivities.removeAll()
+	}
+	
+	private func deleteActivity(_ activity: ActivityRecord) {
 		withAnimation {
-			offsets.map { activities[$0] }.forEach(viewContext.delete)
+			viewContext.delete(activity)
 			saveContext()
 		}
 	}
 	
-	private func deleteActivities(at offsets: IndexSet, from project: String) {
+	private func deleteSelectedActivities() {
 		withAnimation {
-			let activitiesToDelete = offsets.map { groupedActivities[project]![$0] }
-			activitiesToDelete.forEach(viewContext.delete)
+			for objectID in selectedActivities {
+				if let activity = try? viewContext.existingObject(with: objectID) as? ActivityRecord {
+					viewContext.delete(activity)
+				}
+			}
 			saveContext()
+			selectedActivities.removeAll()
 		}
+	}
+	
+	private func exportData() {
+		// Implementation would create CSV export of current view
+		// This is a placeholder for future implementation
+		print("Export functionality would go here")
 	}
 	
 	private func saveContext() {
@@ -142,6 +318,15 @@ struct ContentView: View {
 			let nsError = error as NSError
 			print("Unresolved error \(nsError), \(nsError.userInfo)")
 		}
+	}
+	
+	private func formatDuration(_ duration: Double) -> String {
+		let hours = Int(duration) / 3600
+		let minutes = Int(duration) / 60 % 60
+		if hours > 0 {
+			return "\(hours)h \(minutes)m"
+		}
+		return "\(minutes)m"
 	}
 }
 
@@ -173,27 +358,45 @@ struct ProjectHeader: View {
 
 struct ActivityRow: View {
 	let activity: ActivityRecord
+	let isSelected: Bool
+	let onToggle: () -> Void
 	
 	var body: some View {
-		VStack(alignment: .leading, spacing: 4) {
-			Text(activity.title ?? "Unknown")
-				.font(.headline)
-			HStack {
-				Text(activity.application ?? "Unknown App")
-					.font(.subheadline)
-					.foregroundColor(.secondary)
-				Spacer()
-				Text(formatDuration(activity.duration))
-					.font(.subheadline)
-					.foregroundColor(.secondary)
+		HStack {
+			Button(action: onToggle) {
+				Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+					.foregroundColor(isSelected ? .blue : .gray)
 			}
-			if let projectNumber = activity.projectNumber {
-				Text("Project: \(projectNumber)")
-					.font(.caption)
-					.foregroundColor(.blue)
+			.buttonStyle(BorderlessButtonStyle())
+			
+			VStack(alignment: .leading, spacing: 4) {
+				Text(activity.title ?? "Unknown")
+					.font(.headline)
+				HStack {
+					Text(activity.application ?? "Unknown App")
+						.font(.subheadline)
+						.foregroundColor(.secondary)
+					Spacer()
+					Text(formatDuration(activity.duration))
+						.font(.subheadline)
+						.foregroundColor(.secondary)
+				}
+				if let projectNumber = activity.projectNumber, !projectNumber.isEmpty {
+					Text("Project: \(projectNumber)")
+						.font(.caption)
+						.foregroundColor(.blue)
+						.padding(.vertical, 2)
+						.padding(.horizontal, 6)
+						.background(Color.blue.opacity(0.1))
+						.cornerRadius(4)
+				}
 			}
 		}
 		.padding(.vertical, 2)
+		.contentShape(Rectangle())
+		.onTapGesture {
+			onToggle()
+		}
 	}
 	
 	private func formatDuration(_ duration: Double) -> String {
@@ -206,54 +409,52 @@ struct ActivityRow: View {
 	}
 }
 
-struct ActivityDetailView: View {
-	let activity: ActivityRecord
-	@Environment(\.managedObjectContext) private var viewContext
-	@State private var projectNumber: String
-	
-	init(activity: ActivityRecord) {
-		self.activity = activity
-		_projectNumber = State(initialValue: activity.projectNumber ?? "")
-	}
+struct BulkProjectAssignmentView: View {
+	@Environment(\.dismiss) var dismiss
+	@Binding var projectNumber: String
+	@State private var recentProjects: [String] = []
+	let onAssign: () -> Void
 	
 	var body: some View {
-		Form {
-			Section(header: Text("Activity Details")) {
-				LabeledContent("Application", value: activity.application ?? "Unknown")
-				LabeledContent("Title", value: activity.title ?? "Unknown")
-				if let timestamp = activity.timestamp {
-					LabeledContent("Time", value: timestamp, format: .dateTime)
+		NavigationView {
+			Form {
+				Section(header: Text("Project Number")) {
+					TextField("Enter Project Number", text: $projectNumber)
+						.autocapitalization(.allCharacters)
 				}
-				LabeledContent("Duration", value: formatDuration(activity.duration))
-			}
-			
-			Section(header: Text("Project Assignment")) {
-				TextField("Project Number", text: $projectNumber)
-					.textFieldStyle(.roundedBorder)
-					.onChange(of: projectNumber) { _, newValue in
-						updateProjectNumber(newValue)
+				
+				Section(header: Text("Recent Projects")) {
+					ForEach(recentProjects, id: \.self) { project in
+						Button(action: {
+							projectNumber = project
+						}) {
+							HStack {
+								Text(project)
+								Spacer()
+								if projectNumber == project {
+									Image(systemName: "checkmark")
+										.foregroundColor(.blue)
+								}
+							}
+						}
+						.buttonStyle(BorderlessButtonStyle())
 					}
+				}
 			}
-		}
-		.padding()
-		.navigationTitle("Activity Details")
-	}
-	
-	private func formatDuration(_ duration: Double) -> String {
-		let hours = Int(duration) / 3600
-		let minutes = Int(duration) / 60 % 60
-		if hours > 0 {
-			return "\(hours) hours \(minutes) minutes"
-		}
-		return "\(minutes) minutes"
-	}
-	
-	private func updateProjectNumber(_ newValue: String) {
-		activity.projectNumber = newValue
-		do {
-			try viewContext.save()
-		} catch {
-			print("Failed to save project number: \(error)")
+			.navigationTitle("Assign Project")
+			.navigationBarItems(
+				leading: Button("Cancel") {
+					dismiss()
+				},
+				trailing: Button("Assign") {
+					onAssign()
+				}
+			)
+			.onAppear {
+				// Fetch recent projects from ProjectMatcher
+				// This is a placeholder - would need to implement a method to expose recent projects
+				recentProjects = ["BMS1234", "BMS1235", "BMS1236", "BMS1237", "BMS1238"]
+			}
 		}
 	}
 }

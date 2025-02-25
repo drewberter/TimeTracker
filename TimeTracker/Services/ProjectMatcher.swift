@@ -2,7 +2,9 @@ import Foundation
 
 class ProjectMatcher {
 	static let shared = ProjectMatcher()
-	private var recentProjects: [String] = []  // Store recent project numbers
+	
+	// Changed to public for access from UI
+	private(set) var recentProjects: [String] = []
 	
 	func guessProject(title: String, path: String) -> String? {
 		// First check if title contains a project number
@@ -77,10 +79,31 @@ class ProjectMatcher {
 		if recentProjects.count > 5 {  // Keep only last 5 projects
 			recentProjects.removeLast()
 		}
+		
+		// Save to UserDefaults for persistence
+		saveRecentProjects()
+	}
+	
+	// Persist recent projects
+	private func saveRecentProjects() {
+		UserDefaults.standard.set(recentProjects, forKey: "recentProjects")
+	}
+	
+	// Load recent projects
+	func loadRecentProjects() {
+		if let saved = UserDefaults.standard.stringArray(forKey: "recentProjects") {
+			recentProjects = saved
+		}
 	}
 	
 	// Helper method for Activity struct
 	func guessProject(for activity: Activity) -> String? {
 		return guessProject(title: activity.title, path: activity.path)
+	}
+	
+	// Method to expose recent projects to UI
+	func getRecentProjects() -> [String] {
+		loadRecentProjects() // Make sure we have the latest
+		return recentProjects
 	}
 }
