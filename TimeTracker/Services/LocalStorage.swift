@@ -1,5 +1,6 @@
 import Foundation
 import UserNotifications
+import CoreData
 
 class LocalStorage {
 	static let shared = LocalStorage()
@@ -21,7 +22,42 @@ class LocalStorage {
 		}
 	}
 	
-	func saveActivity(_ activity: Activity, duration: TimeInterval) {
+	func saveActivity(_ activityRecord: ActivityRecord, duration: TimeInterval) {
+		let today = Date()
+		let dateFormatter = DateFormatter()
+		dateFormatter.dateFormat = "yyyy-MM-dd"
+		let fileName = dateFormatter.string(from: today) + ".json"
+		let fileURL = storageURL.appendingPathComponent(fileName)
+		
+		// Load existing data for today
+		var activities: [[String: Any]] = []
+		if let data = try? Data(contentsOf: fileURL),
+		   let json = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] {
+			activities = json
+		}
+		
+		// Add new activity
+		let newActivity: [String: Any] = [
+			"application": activityRecord.application ?? "Unknown",
+			"title": activityRecord.title ?? "Unknown",
+			"path": activityRecord.path ?? "",
+			"projectNumber": activityRecord.projectNumber ?? "",
+			"duration": duration,
+			"timestamp": Date().timeIntervalSince1970
+		]
+		activities.append(newActivity)
+		
+		// Save updated data
+		if let data = try? JSONSerialization.data(withJSONObject: activities, options: .prettyPrinted) {
+			try? data.write(to: fileURL)
+		}
+		
+		// Check storage size
+		checkStorageSize()
+	}
+	
+	// Alternative method that works with the Activity struct
+	func saveActivityStruct(_ activity: Activity, duration: TimeInterval) {
 		let today = Date()
 		let dateFormatter = DateFormatter()
 		dateFormatter.dateFormat = "yyyy-MM-dd"
@@ -40,6 +76,7 @@ class LocalStorage {
 			"application": activity.application,
 			"title": activity.title,
 			"path": activity.path,
+			"projectNumber": activity.projectNumber ?? "",
 			"duration": duration,
 			"timestamp": Date().timeIntervalSince1970
 		]
@@ -89,24 +126,27 @@ class LocalStorage {
 		}
 	}
 	
-	func getActivitiesForDate(_ date: Date) -> [Activity] {
-		let dateFormatter = DateFormatter()
-		dateFormatter.dateFormat = "yyyy-MM-dd"
-		let fileName = dateFormatter.string(from: date) + ".json"
-		let fileURL = storageURL.appendingPathComponent(fileName)
+	func getActivityRecords(for date: Date) -> [ActivityRecord] {
+		// This method should be implemented to work with Core Data
+		// This is just a placeholder - the actual implementation would need to query Core Data
+		let context = PersistenceController.shared.container.viewContext
+		let fetchRequest: NSFetchRequest<ActivityRecord> = ActivityRecord.fetchRequest()
 		
-		guard let data = try? Data(contentsOf: fileURL),
-			  let json = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] else {
+		let calendar = Calendar.current
+		let startOfDay = calendar.startOfDay(for: date)
+		let endOfDay = calendar.date(byAdding: .day, value: 1, to: startOfDay)!
+		
+		fetchRequest.predicate = NSPredicate(
+			format: "timestamp >= %@ AND timestamp < %@",
+			startOfDay as NSDate,
+			endOfDay as NSDate
+		)
+		
+		do {
+			return try context.fetch(fetchRequest)
+		} catch {
+			print("Error fetching activities: \(error)")
 			return []
-		}
-		
-		return json.compactMap { dict in
-			guard let application = dict["application"] as? String,
-				  let title = dict["title"] as? String,
-				  let path = dict["path"] as? String else {
-				return nil
-			}
-			return Activity(application: application, title: title, path: path)
 		}
 	}
 }

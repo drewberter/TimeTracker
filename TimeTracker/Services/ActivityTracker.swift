@@ -5,7 +5,6 @@
 //  Created by Drew on 2/25/25.
 //
 
-
 import Cocoa
 import CoreData
 import UserNotifications
@@ -61,8 +60,8 @@ class ActivityTracker {
 				newActivity.timestamp = Date()
 				newActivity.duration = 0
 				
-				// Try to match project before updating activity
-				if let projectNumber = guessProject(title: window.title) {
+				// Try to match project using the ProjectMatcher
+				if let projectNumber = ProjectMatcher.shared.guessProject(title: window.title, path: window.path) {
 					newActivity.projectNumber = projectNumber
 					promptForProjectConfirmation(projectNumber, activity: newActivity)
 				}
@@ -124,17 +123,6 @@ class ActivityTracker {
 				print("Error saving new activity: \(error)")
 			}
 		}
-	}
-	
-	private func guessProject(title: String) -> String? {
-		// Simple pattern matching for BMS project numbers
-		let pattern = "BMS\\s*\\d{4}"
-		if let regex = try? NSRegularExpression(pattern: pattern, options: .caseInsensitive),
-		   let match = regex.firstMatch(in: title, options: [], range: NSRange(title.startIndex..., in: title)) {
-			let matchedString = String(title[Range(match.range, in: title)!])
-			return matchedString.replacingOccurrences(of: " ", with: "")
-		}
-		return nil
 	}
 	
 	private func promptForProjectConfirmation(_ projectNumber: String, activity: ActivityRecord) {

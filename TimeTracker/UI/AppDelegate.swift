@@ -6,8 +6,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
 	var statusBarItem: NSStatusItem!
 	private var currentActivityItem: NSMenuItem!
 	private var toggleTrackingItem: NSMenuItem!
+	private var timer: Timer?
 	
-	// Remove all ambiguous 'shared' references
 	func applicationDidFinishLaunching(_ notification: Notification) {
 		// Setup menu bar item
 		statusBarItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
@@ -17,8 +17,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
 		
 		setupMenu()
 		
-		// Start tracking
-		Timer.scheduledTimer(withTimeInterval: 30.0, repeats: true) { [weak self] _ in
+		// Start tracking with a shorter interval for more accuracy (15 seconds)
+		timer = Timer.scheduledTimer(withTimeInterval: 15.0, repeats: true) { [weak self] _ in
 			ActivityTracker.shared.checkCurrentActivity()
 			self?.updateCurrentActivityDisplay()
 			self?.updateToggleTrackingMenuTitle()
@@ -136,6 +136,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
 			).trimmingCharacters(in: .whitespaces)
 			
 			activity.projectNumber = projectNumber
+			
+			// Update the recent projects list
+			ProjectMatcher.shared.updateRecentProjects(projectNumber)
+			
 			try? PersistenceController.shared.container.viewContext.save()
 		}
 		
@@ -145,5 +149,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
 	func applicationWillTerminate(_ notification: Notification) {
 		// Make sure to save the final state of any active tracking
 		ActivityTracker.shared.checkCurrentActivity()
+		
+		// Invalidate the timer
+		timer?.invalidate()
 	}
 }
